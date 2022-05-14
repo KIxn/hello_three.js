@@ -57,6 +57,8 @@ class BasicCharacterController {
             const _OnLoad = (animName, anim) => {
                 const clip = anim.animations[0];
                 const action = this._mixer.clipAction(clip);
+                action.clampWhenFinished = true;
+                action.loop = THREE.LoopRepeat;
 
                 this._animations[animName] = {
                     clip: clip,
@@ -66,8 +68,8 @@ class BasicCharacterController {
 
             const loader = new FBXLoader(this._manager);
             loader.setPath('./resources/kangin_lee/');
-            loader.load('Crouched Walking.fbx', (a) => { _OnLoad('walk', a); });
-            loader.load('Running.fbx', (a) => { _OnLoad('run', a); });
+            loader.load('Walking.fbx', (a) => { _OnLoad('walk', a); });
+            loader.load('Run.fbx', (a) => { _OnLoad('run', a); });
             loader.load('Idle.fbx', (a) => { _OnLoad('idle', a); });
             loader.load('Mma Kick.fbx', (a) => { _OnLoad('dance', a); });
         });
@@ -86,7 +88,6 @@ class BasicCharacterController {
             velocity.y * this._decceleration.y,
             velocity.z * this._decceleration.z
         );
-        console.log(timeInSeconds); //TODO control timing of animations with global clock
         frameDecceleration.multiplyScalar(timeInSeconds);
         frameDecceleration.z = Math.sign(frameDecceleration.z) * Math.min(
             Math.abs(frameDecceleration.z), Math.abs(velocity.z));
@@ -100,7 +101,7 @@ class BasicCharacterController {
 
         const acc = this._acceleration.clone();
         if (this._input._keys.shift) {
-            acc.multiplyScalar(2.0);
+            acc.multiplyScalar(5.0);
         }
 
         if (this._stateMachine._currentState.Name == 'dance') {
@@ -145,7 +146,8 @@ class BasicCharacterController {
 
         oldPosition.copy(controlObject.position);
 
-        if (this._mixer) {
+        if (this._mixer) {//TODO time update
+            console.log(controlObject.position);
             this._mixer.update(timeInSeconds);
         }
     }
@@ -350,7 +352,7 @@ class WalkState extends State {
                 curAction.time = prevAction.time * ratio;
             } else {
                 curAction.time = 0.0;
-                curAction.setEffectiveTimeScale(1.0);
+                curAction.setEffectiveTimeScale(1.3);
                 curAction.setEffectiveWeight(1.0);
             }
 
@@ -365,13 +367,14 @@ class WalkState extends State {
     }
 
     Update(timeElapsed, input) {
+
         if (input._keys.forward || input._keys.backward) {
             if (input._keys.shift) {
                 this._parent.SetState('run');
             }
             return;
         }
-
+        //TODO implement backward walk
         this._parent.SetState('idle');
     }
 };
@@ -398,7 +401,7 @@ class RunState extends State {
                 curAction.time = prevAction.time * ratio;
             } else {
                 curAction.time = 0.0;
-                curAction.setEffectiveTimeScale(1.0);
+                curAction.setEffectiveTimeScale(0.5);
                 curAction.setEffectiveWeight(1.0);
             }
 
@@ -527,7 +530,7 @@ class CharacterControllerDemo {
             './resources/skybox_back.png',
             './resources/skybox_front.png',
         ]);
-        this._scene.background = texture;
+        //this._scene.background = texture;
         texture.encoding = THREE.sRGBEncoding;
         this._scene.background = texture;
 
@@ -543,6 +546,7 @@ class CharacterControllerDemo {
 
         this._mixers = [];
         this._previousRAF = null;
+        this._clock = new THREE.Clock();
 
         this._LoadAnimatedModel();
         this._RAF();
@@ -584,23 +588,24 @@ class CharacterControllerDemo {
         this._threejs.setSize(window.innerWidth, window.innerHeight);
     }
 
-    _RAF() {
+    _RAF() { //TODO fix timing
         requestAnimationFrame((t) => {
             if (this._previousRAF === null) {
                 this._previousRAF = t;
             }
 
-            this._RAF();
-
             this._threejs.render(this._scene, this._camera);
-            this._Step(t - this._previousRAF);
+            this._Step(this._clock.getDelta());
             this._previousRAF = t;
+
+            this._RAF();
         });
     }
 
     _Step(timeElapsed) {
-        const timeElapsedS = timeElapsed * 0.001;
+        const timeElapsedS = timeElapsed;
         if (this._mixers) {
+            //update mixers
             this._mixers.map(m => m.update(timeElapsedS));
         }
 
