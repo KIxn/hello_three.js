@@ -86,7 +86,7 @@ class BasicCharacterController {
             velocity.y * this._decceleration.y,
             velocity.z * this._decceleration.z
         );
-        console.log(timeInSeconds);
+        console.log(timeInSeconds); //TODO control timing of animations with global clock
         frameDecceleration.multiplyScalar(timeInSeconds);
         frameDecceleration.z = Math.sign(frameDecceleration.z) * Math.min(
             Math.abs(frameDecceleration.z), Math.abs(velocity.z));
