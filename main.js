@@ -26,6 +26,7 @@ class BasicCharacterController {
         this._decceleration = new THREE.Vector3(-0.0005, -0.0001, -5.0);
         this._acceleration = new THREE.Vector3(1, 0.25, 50.0);
         this._velocity = new THREE.Vector3(0, 0, 0);
+        this._position = new THREE.Vector3();
 
         this._animations = {};
         this._input = new BasicCharacterControllerInput();
@@ -33,6 +34,13 @@ class BasicCharacterController {
             new BasicCharacterControllerProxy(this._animations));
 
         this._LoadModels();
+    }
+
+    getTarget() {
+        if (this._target) {
+            const controlObject = this._target;
+            return (controlObject);
+        }
     }
 
     _LoadModels() {
@@ -68,11 +76,22 @@ class BasicCharacterController {
 
             const loader = new FBXLoader(this._manager);
             loader.setPath('./resources/kangin_lee/');
-            loader.load('Walking.fbx', (a) => { _OnLoad('walk', a); });
+            loader.load('Crouched Walking.fbx', (a) => { _OnLoad('walk', a); });
             loader.load('Run.fbx', (a) => { _OnLoad('run', a); });
             loader.load('Idle.fbx', (a) => { _OnLoad('idle', a); });
             loader.load('Mma Kick.fbx', (a) => { _OnLoad('dance', a); });
         });
+    }
+
+    get Position() {
+        return this._position;
+    }
+
+    get Rotation() {
+        if (!this._target) {
+            return new THREE.Quaternion();
+        }
+        return this._target.quaternion;
     }
 
     Update(timeInSeconds) {
@@ -101,7 +120,7 @@ class BasicCharacterController {
 
         const acc = this._acceleration.clone();
         if (this._input._keys.shift) {
-            acc.multiplyScalar(5.0);
+            acc.multiplyScalar(6.0);
         }
 
         if (this._stateMachine._currentState.Name == 'dance') {
@@ -146,8 +165,9 @@ class BasicCharacterController {
 
         oldPosition.copy(controlObject.position);
 
-        if (this._mixer) {//TODO time update
-            console.log(controlObject.position);
+        this._position.copy(controlObject.position);
+
+        if (this._mixer) {
             this._mixer.update(timeInSeconds);
         }
     }
@@ -401,7 +421,7 @@ class RunState extends State {
                 curAction.time = prevAction.time * ratio;
             } else {
                 curAction.time = 0.0;
-                curAction.setEffectiveTimeScale(0.5);
+                curAction.setEffectiveTimeScale(0.1);
                 curAction.setEffectiveWeight(1.0);
             }
 
@@ -465,6 +485,47 @@ class IdleState extends State {
 };
 
 
+class ThirdPersonCamera {
+    constructor(params) {
+        this._params = params;
+        this._camera = params.camera;
+
+        this._currentPosition = new THREE.Vector3();
+        this._currentLookat = new THREE.Vector3();
+    }
+
+    _CalculateIdealOffset() {
+        const idealOffset = new THREE.Vector3(-15, 20, -30);
+        console.log(this._params.target.Rotation);
+        console.log(this._params.target.Position);
+        idealOffset.applyQuaternion(this._params.target.Rotation);
+        idealOffset.add(this._params.target.Position);
+        return idealOffset;
+    }
+
+    _CalculateIdealLookat() {
+        const idealLookat = new THREE.Vector3(0, 10, 50);
+        idealLookat.applyQuaternion(this._params.target.Rotation);
+        idealLookat.add(this._params.target.Position);
+        return idealLookat;
+    }
+
+    Update(timeElapsed) {
+        const idealOffset = this._CalculateIdealOffset();
+        const idealLookat = this._CalculateIdealLookat();
+
+        // const t = 0.05;
+        // const t = 4.0 * timeElapsed;
+        const t = 1.0 - Math.pow(0.001, timeElapsed);
+
+        this._currentPosition.lerp(idealOffset, t);
+        this._currentLookat.lerp(idealLookat, t);
+
+        this._camera.position.copy(this._currentPosition);
+        this._camera.lookAt(this._currentLookat);
+    }
+}
+
 class CharacterControllerDemo {
     constructor() {
         this._Initialize();
@@ -523,10 +584,10 @@ class CharacterControllerDemo {
 
         const loader = new THREE.CubeTextureLoader();
         const texture = loader.load([
-            './resources/skybox_right.png',
-            './resources/skybox_left.png',
             './resources/skybox_up.png',
             './resources/skybox_down.png',
+            './resources/skybox_right.png',
+            './resources/skybox_left.png',
             './resources/skybox_back.png',
             './resources/skybox_front.png',
         ]);
@@ -558,6 +619,10 @@ class CharacterControllerDemo {
             scene: this._scene,
         }
         this._controls = new BasicCharacterController(params);
+        this._thirdPersonCamera = new ThirdPersonCamera({
+            camera: this._camera,
+            target: this._controls,
+        });
     }
 
     _LoadAnimatedModelAndPlay(path, modelFile, animFile, offset) {
@@ -588,7 +653,7 @@ class CharacterControllerDemo {
         this._threejs.setSize(window.innerWidth, window.innerHeight);
     }
 
-    _RAF() { //TODO fix timing
+    _RAF() {
         requestAnimationFrame((t) => {
             if (this._previousRAF === null) {
                 this._previousRAF = t;
@@ -612,6 +677,8 @@ class CharacterControllerDemo {
         if (this._controls) {
             this._controls.Update(timeElapsedS);
         }
+
+        this._thirdPersonCamera.Update(timeElapsedS);
     }
 }
 
