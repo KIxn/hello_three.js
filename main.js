@@ -582,23 +582,39 @@ class CharacterControllerDemo {
         controls.update();
 
 
+        const textureLoader = new THREE.TextureLoader();
+
+        const _PlaneBaseCol = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
+        const _PlaneNorm = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_normal.jpg");
+        const _PlaneHeight = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_height.png");
+        const _PlaneRoughness = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_roughness.jpg");
+        const _PlaneAmbientOcc = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_ambientOcclusion.jpg");
+
+
         const loader = new THREE.CubeTextureLoader();
         const texture = loader.load([
+            './resources/skybox_left.png',
+            './resources/skybox_right.png',
             './resources/skybox_up.png',
             './resources/skybox_down.png',
-            './resources/skybox_right.png',
-            './resources/skybox_left.png',
-            './resources/skybox_back.png',
             './resources/skybox_front.png',
+            './resources/skybox_back.png',
+
         ]);
-        //this._scene.background = texture;
+        this._scene.background = texture;
         texture.encoding = THREE.sRGBEncoding;
         this._scene.background = texture;
 
         const plane = new THREE.Mesh(
             new THREE.PlaneGeometry(500, 500, 10, 10),
             new THREE.MeshStandardMaterial({
-                color: "rgb(40, 44, 52)",
+                map :_PlaneBaseCol,
+                nomralMap:_PlaneNorm,
+                displacementMap: _PlaneHeight,
+                displacementScale:0.05,
+                roughnessMap: _PlaneRoughness,
+                roughness:0.5,
+                aoMap:_PlaneAmbientOcc,
             }));
         plane.castShadow = false;
         plane.receiveShadow = true;
@@ -620,8 +636,8 @@ class CharacterControllerDemo {
         }
         this._controls = new BasicCharacterController(params);
         this._thirdPersonCamera = new ThirdPersonCamera({
-            camera: this._camera,
-            target: this._controls,
+           camera: this._camera,
+           target: this._controls,
         });
     }
 
