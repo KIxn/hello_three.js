@@ -15,7 +15,6 @@ class BasicCharacterControllerProxy {
     }
 };
 
-
 class BasicCharacterController {
     constructor(params) {
         this._Init(params);
@@ -52,8 +51,11 @@ class BasicCharacterController {
                 c.castShadow = true;
             });
 
+
+
             this._target = fbx;
             this._params.scene.add(this._target);
+
 
             this._mixer = new THREE.AnimationMixer(this._target);
 
@@ -81,6 +83,7 @@ class BasicCharacterController {
             loader.load('Idle.fbx', (a) => { _OnLoad('idle', a); });
             loader.load('Mma Kick.fbx', (a) => { _OnLoad('dance', a); });
         });
+
     }
 
     get Position() {
@@ -496,8 +499,6 @@ class ThirdPersonCamera {
 
     _CalculateIdealOffset() {
         const idealOffset = new THREE.Vector3(-15, 20, -30);
-        console.log(this._params.target.Rotation);
-        console.log(this._params.target.Position);
         idealOffset.applyQuaternion(this._params.target.Rotation);
         idealOffset.add(this._params.target.Position);
         return idealOffset;
@@ -576,14 +577,15 @@ class CharacterControllerDemo {
         light = new THREE.AmbientLight(0xFFFFFF, 0.25);
         this._scene.add(light);
 
+
         const controls = new OrbitControls(
             this._camera, this._threejs.domElement);
         controls.target.set(0, 10, 0);
         controls.update();
 
 
-        const textureLoader = new THREE.TextureLoader();
 
+        const textureLoader = new THREE.TextureLoader();
         const _PlaneBaseCol = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
         const _PlaneNorm = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_normal.jpg");
         const _PlaneHeight = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_height.png");
@@ -608,18 +610,23 @@ class CharacterControllerDemo {
         const plane = new THREE.Mesh(
             new THREE.PlaneGeometry(500, 500, 10, 10),
             new THREE.MeshStandardMaterial({
-                map :_PlaneBaseCol,
-                nomralMap:_PlaneNorm,
+                map: _PlaneBaseCol,
+                normalMap: _PlaneNorm,
                 displacementMap: _PlaneHeight,
-                displacementScale:0.05,
+                displacementScale: 0.05,
                 roughnessMap: _PlaneRoughness,
-                roughness:0.5,
-                aoMap:_PlaneAmbientOcc,
+                roughness: 0.5,
+                aoMap: _PlaneAmbientOcc,
             }));
         plane.castShadow = false;
         plane.receiveShadow = true;
         plane.rotation.x = -Math.PI / 2;
         this._scene.add(plane);
+
+
+
+
+        this._LoadMaze();
 
         this._mixers = [];
         this._previousRAF = null;
@@ -636,8 +643,8 @@ class CharacterControllerDemo {
         }
         this._controls = new BasicCharacterController(params);
         this._thirdPersonCamera = new ThirdPersonCamera({
-           camera: this._camera,
-           target: this._controls,
+            camera: this._camera,
+            target: this._controls,
         });
     }
 
@@ -662,6 +669,18 @@ class CharacterControllerDemo {
             this._scene.add(fbx);
         });
     }
+    _LoadMaze() {
+        const loader = new GLTFLoader();
+        loader.load('./resources/maze_example.gltf', (gltf) => {
+            gltf.scene.traverse(c => {
+                c.castShadow = true;
+            });
+            gltf.scene.scale.multiplyScalar(10000);
+            this._scene.add(gltf.scene);
+            console.log(gltf.scene);
+        });
+    }
+
 
     _OnWindowResize() {
         this._camera.aspect = window.innerWidth / window.innerHeight;
