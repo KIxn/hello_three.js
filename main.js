@@ -62,6 +62,7 @@ class BasicCharacterController {
             this._manager = new THREE.LoadingManager();
             this._manager.onLoad = () => {
                 this._stateMachine.SetState('idle');
+                document.getElementById('loadingScreen').className = 'loaderHidden';
             };
 
             const _OnLoad = (animName, anim) => {
@@ -607,6 +608,8 @@ class CharacterControllerDemo {
         texture.encoding = THREE.sRGBEncoding;
         this._scene.background = texture;
 
+        this._LoadMaze();
+
         const plane = new THREE.Mesh(
             new THREE.PlaneGeometry(500, 500, 10, 10),
             new THREE.MeshStandardMaterial({
@@ -626,7 +629,7 @@ class CharacterControllerDemo {
 
 
 
-        this._LoadMaze();
+
 
         this._mixers = [];
         this._previousRAF = null;
