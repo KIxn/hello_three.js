@@ -64,7 +64,6 @@ class BasicCharacterController {
                 this._stateMachine.SetState('idle');
                 document.getElementById('loadingScreen').className = 'loaderHidden';
             };
-
             const _OnLoad = (animName, anim) => {
                 const clip = anim.animations[0];
                 const action = this._mixer.clipAction(clip);
@@ -679,6 +678,9 @@ class CharacterControllerDemo {
                 c.castShadow = true;
             });
             gltf.scene.scale.multiplyScalar(10000);
+            gltf.scene.position.x = 0;
+            gltf.scene.position.y = 10;
+            gltf.scene.position.z = 0;
             this._scene.add(gltf.scene);
             console.log(gltf.scene);
         });
