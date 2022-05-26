@@ -738,10 +738,9 @@ class CharacterControllerDemo {
         console.log("added physics to ball");
     }
     _updatePhysics(delta) {
-        this.physicsWorld.stepSimulation(delta , 10);
+        this.physicsWorld.stepSimulation(delta, 0.1);
         for (let i = 0; i < this.rigidBodies.length; i++) {
             let threeObject = this.rigidBodies[i];
-            console.log(threeObject.position);
             let ammoObject = threeObject.userData.physicsBody;
             let ms = ammoObject.getMotionState();
             if (ms) {
@@ -816,12 +815,13 @@ class CharacterControllerDemo {
                 this._previousRAF = t;
             }
 
-           if (this.physicsWorld) {
-                this._updatePhysics(this._clock.getDelta());
+            let delta = this._clock.getDelta();
 
+            if (this.physicsWorld) {
+                this._updatePhysics(delta);
             }
             this._threejs.render(this._scene, this._camera);
-            this._Step(this._clock.getDelta());
+            this._Step(delta);
             this._previousRAF = t;
             this._RAF();
         });
