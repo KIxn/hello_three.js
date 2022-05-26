@@ -1,5 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.118/build/three.module.js';
-
+import Ammo from './ammo.js'
 import { FBXLoader } from 'https://cdn.jsdelivr.net/npm/three@0.118.1/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.118.1/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.118/examples/jsm/controls/OrbitControls.js';
@@ -26,7 +26,6 @@ class BasicCharacterController {
         this._acceleration = new THREE.Vector3(1, 0.25, 50.0);
         this._velocity = new THREE.Vector3(0, 0, 0);
         this._position = new THREE.Vector3();
-
         this._animations = {};
         this._input = new BasicCharacterControllerInput();
         this._stateMachine = new CharacterFSM(
@@ -511,6 +510,24 @@ class ThirdPersonCamera {
         idealLookat.add(this._params.target.Position);
         return idealLookat;
     }
+    _updatePhysics(delta) {
+        this.physicsWorld.setSimulation(delta*10, 10);
+
+        for (let i = 0; i < this.rigidBodies.length; i++) {
+            let threeObject = this.rigidBodies[i];
+            let ammoObject = threeObject.userData.physicsBody;
+            let ms = ammoObject.getMotionState();
+
+            if (ms) {
+                ms.getWorldTransform(this.tempTransform);
+                let pos = this.tempTransform.getOrigin();
+                let quat = this.temptransform.getRotation();
+                threeObject.position.set(pos.x(), pos.y(), pos.z());
+                threeObject.quaternion.set(quat.x(), quat.y(), quat.z());
+            }
+
+        }
+    }
 
     Update(timeElapsed) {
         const idealOffset = this._CalculateIdealOffset();
@@ -526,6 +543,8 @@ class ThirdPersonCamera {
         this._camera.position.copy(this._currentPosition);
         this._camera.lookAt(this._currentLookat);
     }
+
+
 }
 
 class CharacterControllerDemo {
@@ -586,14 +605,6 @@ class CharacterControllerDemo {
 
 
 
-        const textureLoader = new THREE.TextureLoader();
-        const _PlaneBaseCol = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
-        const _PlaneNorm = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_normal.jpg");
-        const _PlaneHeight = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_height.png");
-        const _PlaneRoughness = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_roughness.jpg");
-        const _PlaneAmbientOcc = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_ambientOcclusion.jpg");
-
-
         const loader = new THREE.CubeTextureLoader();
         const texture = loader.load([
             './resources/skybox_left.png',
@@ -610,8 +621,48 @@ class CharacterControllerDemo {
 
         this._LoadMaze();
 
+        this._mixers = [];
+        this._previousRAF = null;
+        this._clock = new THREE.Clock();
+
+        this._LoadAnimatedModel();
+        this._StartAmmo();
+        this._RAF();
+    }
+
+
+    _StartAmmo() {
+        Ammo().then((Ammo) => {
+            Ammo = Ammo;
+            this._ammoClone = Ammo;
+            this._createAmmo(Ammo);
+            console.log(Ammo);
+        })
+    }
+
+    _createAmmo(Ammo = this._ammoClone) {
+        this.tempTransform = new Ammo.btTransform();
+        this.setupPhysicsWolrd(Ammo);
+        this._createPlane(Ammo);
+        this._createBall(Ammo);
+    }
+
+
+    _createPlane(Ammo = this._ammoClone) {
+        let pos = { x: 0, y: 0, z: 0 },
+            quat = { x: 0, y: 0, z: 0, w: 1 },
+            scale = { x: 5000, y: 5000, z:10 },
+            mass = 0;
+
+        const textureLoader = new THREE.TextureLoader();
+        const _PlaneBaseCol = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
+        const _PlaneNorm = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_normal.jpg");
+        const _PlaneHeight = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_height.png");
+        const _PlaneRoughness = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_roughness.jpg");
+        const _PlaneAmbientOcc = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_ambientOcclusion.jpg");
+
         const plane = new THREE.Mesh(
-            new THREE.PlaneGeometry(500, 500, 10, 10),
+            new THREE.BoxGeometry(scale.x, scale.y, scale.z),
             new THREE.MeshStandardMaterial({
                 map: _PlaneBaseCol,
                 normalMap: _PlaneNorm,
@@ -626,19 +677,77 @@ class CharacterControllerDemo {
         plane.rotation.x = -Math.PI / 2;
         this._scene.add(plane);
 
+        console.log(Ammo);
 
+        let transform = new Ammo.btTransform();
+        transform.setIdientity();
+        transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+        transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
 
+        let motionState = new Ammo.btDefaultMotionState(transform);
+        let localInertia = new Ammo.btVector3(0, 0, 0);
 
+        let Shape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5, scale.y * 0.5, scale.z * 0.5));
+        Shape.setMargin(0.05);
+        Shape.calculateLocalInertia(mass, localInertia);
 
+        let rigidBodyInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, Shape, localInertia);
+        let rBody = new Ammo.btRigidBody(rigidBodyInfo);
 
-        this._mixers = [];
-        this._previousRAF = null;
-        this._clock = new THREE.Clock();
-
-        this._LoadAnimatedModel();
-        this._RAF();
+        this.physicsWorld.addRigidBody(rBody);
     }
 
+    _createBall(Ammo = this._ammoClone) {
+        let pos = { x: 0, y: 0, z: 0 },
+            quat = { x: 0, y: 0, z: 0, w: 1 },
+            radius = 500,
+            mass = 1;
+
+
+        let ball = new THREE.Mesh(new THREE.SphereGeometry(radius), new THREE.MeshPhongMaterial({ color: 0xff000 }));
+        ball.position.set(pos.x, pos.y, pos.z);
+
+        ball.castShadow = true;
+        ball.receiveShadow = true;
+
+        this.scene.add(ball);
+
+        let transform = new Ammo.btTransform();
+        transform.setIdientity();
+        transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+        transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+
+
+        let motionState = new Ammo.btDefaultMotionState(transform);
+        let localInertia = new Ammo.btVector3(0, 0, 0);
+
+        let Shape = new Ammo.btSphereShape(radius);
+        Shape.setMargin(0.05);
+        Shape.calculateLocalInertia(mass, localInertia);
+
+        let rigidBodyInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, Shape, localInertia);
+        let rBody = new Ammo.btRigidBody(rigidBodyInfo);
+
+        this.physicsWorld.addRigidBody(rBody);
+        ball.userData.physicsBody = rBody;
+        this.rigidBodies.push(ball);
+
+
+
+
+
+
+    }
+    _setupPhysicsWorld(Ammo = this._ammoClone) {
+        let collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
+        let dispatcher = new Ammo.btnCollisionDispatcher(collisionConfiguration);
+        let overlappingPairCache = new Ammo.btDbvtBroadphase();
+        let solver = new Ammo.btSequentialImpulseConstraintSolver();
+        this.physicsWorld = new Ammo_btDiscreteDynamicWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+        this.physicsWorld.setGravity(new Ammo.btVector3(0, -9.8, 0));
+        console.log('Physics world init');
+
+    }
     _LoadAnimatedModel() {
         const params = {
             camera: this._camera,
@@ -674,7 +783,7 @@ class CharacterControllerDemo {
     }
     _LoadMaze() {
         const loader = new GLTFLoader();
-        loader.load('./resources/maze_example.gltf', (gltf) => {
+        loader.load('./resources/TestingMaze.gltf', (gltf) => {
             gltf.scene.traverse(c => {
                 c.castShadow = true;
             });
@@ -697,9 +806,14 @@ class CharacterControllerDemo {
                 this._previousRAF = t;
             }
 
+            if (this.physicsWorld){
+                this._updatePhysics(this.delta);
+            }
             this._threejs.render(this._scene, this._camera);
             this._Step(this._clock.getDelta());
             this._previousRAF = t;
+
+
 
             this._RAF();
         });
