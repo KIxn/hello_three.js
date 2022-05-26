@@ -950,4 +950,5 @@ var Ammo = (() => {
     define([], function() { return Ammo; });
   else if (typeof exports === 'object')
     exports["Ammo"] = Ammo;
+
   export default Ammo;
