@@ -549,7 +549,6 @@ class CharacterControllerDemo {
         window.addEventListener('resize', () => {
             this._OnWindowResize();
         }, false);
-
         const fov = 60;
         const aspect = 1920 / 1080;
         const near = 1.0;
@@ -646,8 +645,10 @@ class CharacterControllerDemo {
     _createPlane(Ammo = this._ammoClone) {
         let pos = { x: 0, y: 0, z: 0 },
             quat = { x: 0, y: 0, z: 0, w: 1 },
-            scale = { x: 500, y: 500, z: 10 },
+            scale = { x: 30, y: 2, z: 30 },
             mass = 0;
+
+
 
         const textureLoader = new THREE.TextureLoader();
         const _PlaneBaseCol = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
@@ -657,23 +658,16 @@ class CharacterControllerDemo {
         const _PlaneAmbientOcc = textureLoader.load("./resources/PlaneFloor/Rocks_Hexagons_001_ambientOcclusion.jpg");
 
         const plane = new THREE.Mesh(
-            new THREE.PlaneGeometry(500, 500, 10, 10),
-            new THREE.MeshStandardMaterial({
-                map: _PlaneBaseCol,
-                normalMap: _PlaneNorm,
-                displacementMap: _PlaneHeight,
-                displacementScale: 0.05,
-                roughnessMap: _PlaneRoughness,
-                roughness: 0.5,
-                aoMap: _PlaneAmbientOcc,
-            }));
+            new THREE.BoxGeometry(scale.x, scale.y, scale.z),new THREE.MeshPhongMaterial({color: 0xffffff}));
+
         plane.castShadow = false;
         plane.receiveShadow = true;
-        plane.rotation.x = -Math.PI / 2;
         this._scene.add(plane);
 
 
+
         console.log("plane added to scene");
+        //console.log(plane.position)
 
 
         let transform = new Ammo.btTransform();
@@ -688,13 +682,12 @@ class CharacterControllerDemo {
 
 
 
-        let Shape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5, scale.y * 0.5, scale.z * 0.5));
+        let Shape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x*0.5, scale.y*0.5, scale.z*0.5));
         Shape.setMargin(0.05);
         Shape.calculateLocalInertia(mass, localInertia);
 
         let rigidBodyInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, Shape, localInertia);
         let rBody = new Ammo.btRigidBody(rigidBodyInfo);
-
         this.physicsWorld.addRigidBody(rBody);
         console.log("set up physics for plane");
 
@@ -702,7 +695,7 @@ class CharacterControllerDemo {
     }
 
     _createBall(Ammo = this._ammoClone) {
-        let pos = { x: 0, y: 40, z: 0 },
+        let pos = { x: 0, y: 20, z: 0 },
             quat = { x: 0, y: 0, z: 0, w: 1 },
             radius = 2,
             mass = 1;
@@ -734,12 +727,14 @@ class CharacterControllerDemo {
 
         this.physicsWorld.addRigidBody(rBody);
         ball.userData.physicsBody = rBody;
+
         this.rigidBodies.push(ball);
         console.log("added physics to ball");
     }
     _updatePhysics(delta) {
-        this.physicsWorld.stepSimulation(delta, 0.1);
-        for (let i = 0; i < this.rigidBodies.length; i++) {
+        this.physicsWorld.stepSimulation(delta, 10);
+
+            for (let i = 0; i < this.rigidBodies.length; i++) {
             let threeObject = this.rigidBodies[i];
             let ammoObject = threeObject.userData.physicsBody;
             let ms = ammoObject.getMotionState();
@@ -748,9 +743,11 @@ class CharacterControllerDemo {
                 let pos = this.tempTransform.getOrigin();
                 let quat = this.tempTransform.getRotation();
                 threeObject.position.set(pos.x(), pos.y(), pos.z());
+                console.log(threeObject.position);
                 threeObject.quaternion.set(quat.x(), quat.y(), quat.z());
-            }
 
+
+            }
         }
 
     }
@@ -817,9 +814,9 @@ class CharacterControllerDemo {
 
             let delta = this._clock.getDelta();
 
-            if (this.physicsWorld) {
-                this._updatePhysics(delta);
-            }
+         //  if (this.physicsWorld) {
+           //    this._updatePhysics(delta);
+            //}
             this._threejs.render(this._scene, this._camera);
             this._Step(delta);
             this._previousRAF = t;
@@ -833,12 +830,15 @@ class CharacterControllerDemo {
             //update mixers
             this._mixers.map(m => m.update(timeElapsedS));
         }
+        if (this.physicsWorld) {
+                this._updatePhysics(timeElapsed);
+         }
 
         if (this._controls) {
             this._controls.Update(timeElapsedS);
         }
 
-        this._thirdPersonCamera.Update(timeElapsedS);
+     this._thirdPersonCamera.Update(timeElapsedS);
     }
 }
 

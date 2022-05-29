@@ -1,0 +1,31 @@
+{
+  "name": "hello_three",
+  "version": "1.0.0",
+  "description": "Basic character controller with three.js",
+  "main": "main.js",
+  "dependencies": {
+    "stats.js": "^0.17.0"
+  },
+  "devDependencies": {
+    "@types/dat.gui": "^0.7.7",
+    "@types/three": "^0.140.0",
+    "ts-loader": "^9.3.0",
+    "ts-node": "^10.8.0",
+    "webpack": "^5.72.1",
+    "webpack-cli": "^4.9.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KIxn/hello_three.js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KIxn/hello_three.js/issues"
+  },
+  "homepage": "https://github.com/KIxn/hello_three.js#readme"
+}
