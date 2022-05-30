@@ -3,6 +3,13 @@ import { FBXLoader } from 'https://cdn.jsdelivr.net/npm/three@0.118.1/examples/j
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.118.1/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.118/examples/jsm/controls/OrbitControls.js';
 
+//Global
+let peekView = false;
+let Target = null;
+let panning = false;
+let pos = null;
+let Cam = null;
+let ctrls = null;
 
 class BasicCharacterControllerProxy {
     constructor(animations) {
@@ -191,6 +198,23 @@ class BasicCharacterControllerInput {
         };
         document.addEventListener('keydown', (e) => this._onKeyDown(e), false);
         document.addEventListener('keyup', (e) => this._onKeyUp(e), false);
+        document.addEventListener('mousedown', (e) => {
+            panning = true;
+            if (pos === null) {
+                const idealOffset = new THREE.Vector3(-15, 30, -60);
+                idealOffset.applyQuaternion(Target.Rotation);
+                idealOffset.add(Target.Position);
+                Cam.position.copy(idealOffset);
+                const idealLookat = new THREE.Vector3(0, 20, 50);
+                idealLookat.applyQuaternion(Target.Rotation);
+                idealLookat.add(Target.Position);
+                ctrls.target = idealLookat;
+            }
+        });
+        document.addEventListener('mouseup', (e) => {
+            panning = false;
+            pos = null;
+        });
     }
 
     _onKeyDown(event) {
@@ -235,6 +259,9 @@ class BasicCharacterControllerInput {
                 break;
             case 16: // SHIFT
                 this._keys.shift = false;
+                break;
+            case 67:
+                peekView = !peekView
                 break;
         }
     }
@@ -528,6 +555,53 @@ class ThirdPersonCamera {
 
 }
 
+class PerspectiveCamera {
+    constructor(params, controls) {
+        this._params = params;
+        this._camera = params.camera;
+        this._controls = controls;
+
+        this._currentPosition = new THREE.Vector3();
+        this._currentLookat = new THREE.Vector3();
+    }
+
+    _CalculateIdealOffset() {
+        const idealOffset = new THREE.Vector3(-15, 50, -60);
+        idealOffset.applyQuaternion(this._params.target.Rotation);
+        idealOffset.add(this._params.target.Position);
+        return idealOffset;
+    }
+
+    _CalculateIdealLookat() {
+        const idealLookat = new THREE.Vector3(0, 10, 50);
+        idealLookat.applyQuaternion(this._params.target.Rotation);
+        idealLookat.add(this._params.target.Position);
+        return idealLookat;
+    }
+
+    Update(timeElapsed) {
+        if (!panning) {
+            const idealOffset = this._CalculateIdealOffset();
+            const idealLookat = this._CalculateIdealLookat();
+
+            // const t = 0.05;
+            // const t = 4.0 * timeElapsed;
+            const t = 1.0 - Math.pow(0.001, timeElapsed);
+
+            this._currentPosition.lerp(idealOffset, t);
+            this._currentLookat.lerp(idealLookat, t);
+
+            this._camera.position.copy(this._currentPosition);
+            this._camera.lookAt(this._currentLookat);
+        }
+        else {
+            this._controls.update();
+        }
+    }
+
+
+}
+
 
 class CharacterControllerDemo {
     constructor() {
@@ -553,8 +627,15 @@ class CharacterControllerDemo {
         const aspect = 1920 / 1080;
         const near = 1.0;
         const far = 1000.0;
+
+        //create cameras
         this._camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-        this._camera.position.set(25, 10, 25);
+
+        const controls = new OrbitControls(this._camera, this._threejs.domElement);
+        controls.keys = {};
+        ctrls = controls;
+
+        controls.update();
 
         this._scene = new THREE.Scene();
 
@@ -579,13 +660,6 @@ class CharacterControllerDemo {
         this._scene.add(light);
 
 
-        const controls = new OrbitControls(
-            this._camera, this._threejs.domElement);
-        controls.target.set(0, 10, 0);
-        controls.update();
-
-
-
         const loader = new THREE.CubeTextureLoader();
         const texture = loader.load([
             '../resources/skybox_left.png',
@@ -600,26 +674,58 @@ class CharacterControllerDemo {
         texture.encoding = THREE.sRGBEncoding;
         this._scene.background = texture;
 
+        //plane
+        const textureLoader = new THREE.TextureLoader();
+        const _PlaneBaseCol = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
+        const _PlaneNorm = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_normal.jpg");
+        const _PlaneHeight = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_height.png");
+        const _PlaneRoughness = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_roughness.jpg");
+        const _PlaneAmbientOcc = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_ambientOcclusion.jpg");
+
+        const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(500, 500, 10, 10),
+            new THREE.MeshStandardMaterial({
+                map: _PlaneBaseCol,
+                normalMap: _PlaneNorm,
+                displacementMap: _PlaneHeight,
+                displacementScale: 0.05,
+                roughnessMap: _PlaneRoughness,
+                roughness: 0.5,
+                aoMap: _PlaneAmbientOcc,
+            }));
+        plane.castShadow = false;
+        plane.receiveShadow = true;
+        plane.rotation.x = -Math.PI / 2;
+        this._scene.add(plane);
+
         this._LoadMaze();
 
         this._mixers = [];
         this._previousRAF = null;
         this._clock = new THREE.Clock();
 
-        this._LoadAnimatedModel();
+        this._LoadAnimatedModel(controls);
         this._RAF();
     }
 
-    _LoadAnimatedModel() {
+    _LoadAnimatedModel(ctrls) {
         const params = {
             camera: this._camera,
             scene: this._scene,
         }
         this._controls = new BasicCharacterController(params);
+        Target = this._controls;
+        Cam = this._camera;
+        //create cameras
         this._thirdPersonCamera = new ThirdPersonCamera({
             camera: this._camera,
             target: this._controls,
         });
+
+        this._perspectiveCamera = new PerspectiveCamera({
+            camera: this._camera,
+            target: this._controls,
+        }, ctrls);
     }
 
     _LoadAnimatedModelAndPlay(path, modelFile, animFile, offset) {
@@ -653,7 +759,6 @@ class CharacterControllerDemo {
             this._scene.add(gltf.scene);
         });
     }
-
 
     _OnWindowResize() {
         this._camera.aspect = window.innerWidth / window.innerHeight;
@@ -693,7 +798,12 @@ class CharacterControllerDemo {
             this._controls.Update(timeElapsedS);
         }
 
-        this._thirdPersonCamera.Update(timeElapsedS);
+        if (peekView) {
+            this._perspectiveCamera.Update(timeElapsedS);
+        }
+        else {
+            this._thirdPersonCamera.Update(timeElapsedS);
+        }
     }
 }
 
