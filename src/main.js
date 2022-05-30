@@ -3,13 +3,17 @@ import { FBXLoader } from 'https://cdn.jsdelivr.net/npm/three@0.118.1/examples/j
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.118.1/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.118/examples/jsm/controls/OrbitControls.js';
 
+
+
 //Global
 let peekView = false;
 let Target = null;
+let AvailableControls = null;
 let panning = false;
 let pos = null;
 let Cam = null;
 let ctrls = null;
+let DistFromBox=8;
 
 class BasicCharacterControllerProxy {
     constructor(animations) {
@@ -33,6 +37,7 @@ class BasicCharacterController {
         this._velocity = new THREE.Vector3(0, 0, 0);
         this._position = new THREE.Vector3();
         this._animations = {};
+        this.player = {};
         this._input = new BasicCharacterControllerInput();
         this._stateMachine = new CharacterFSM(
             new BasicCharacterControllerProxy(this._animations));
@@ -81,7 +86,6 @@ class BasicCharacterController {
                     action: action,
                 };
             };
-
             const loader = new FBXLoader(this._manager);
             loader.setPath('../resources/kangin_lee/');
             loader.load('Crouched Walking.fbx', (a) => { _OnLoad('walk', a); });
@@ -226,7 +230,7 @@ class BasicCharacterControllerInput {
                 this._keys.left = true;
                 break;
             case 83: // s
-                this._keys.backward = true;
+                this._keys.backward = false; //disabled for now
                 break;
             case 68: // d
                 this._keys.right = true;
@@ -235,6 +239,7 @@ class BasicCharacterControllerInput {
                 this._keys.space = true;
                 break;
             case 16: // SHIFT
+                DistFromBox=18;// increase raycasting distance because character is leaned forward when running
                 this._keys.shift = true;
                 break;
         }
@@ -258,6 +263,7 @@ class BasicCharacterControllerInput {
                 this._keys.space = false;
                 break;
             case 16: // SHIFT
+                DistFromBox=8; // set raycasting distance back to 8 because character is walking normally
                 this._keys.shift = false;
                 break;
             case 67:
@@ -507,6 +513,7 @@ class IdleState extends State {
     Update(_, input) {
         if (input._keys.forward || input._keys.backward) {
             this._parent.SetState('walk');
+
         } else if (input._keys.space) {
             this._parent.SetState('dance');
         }
@@ -551,8 +558,6 @@ class ThirdPersonCamera {
         this._camera.position.copy(this._currentPosition);
         this._camera.lookAt(this._currentLookat);
     }
-
-
 }
 
 class PerspectiveCamera {
@@ -639,6 +644,7 @@ class CharacterControllerDemo {
 
         this._scene = new THREE.Scene();
 
+
         let light = new THREE.DirectionalLight(0xFFFFFF, 1.0);
         light.position.set(-100, 100, 100);
         light.target.position.set(0, 0, 0);
@@ -674,6 +680,7 @@ class CharacterControllerDemo {
         texture.encoding = THREE.sRGBEncoding;
         this._scene.background = texture;
 
+
         //plane
         const textureLoader = new THREE.TextureLoader();
         const _PlaneBaseCol = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_basecolor.jpg");
@@ -683,7 +690,7 @@ class CharacterControllerDemo {
         const _PlaneAmbientOcc = textureLoader.load("../resources/PlaneFloor/Rocks_Hexagons_001_ambientOcclusion.jpg");
 
         const plane = new THREE.Mesh(
-            new THREE.PlaneGeometry(500, 500, 10, 10),
+            new THREE.PlaneGeometry(2000, 2000, 10, 10),
             new THREE.MeshStandardMaterial({
                 map: _PlaneBaseCol,
                 normalMap: _PlaneNorm,
@@ -698,8 +705,9 @@ class CharacterControllerDemo {
         plane.rotation.x = -Math.PI / 2;
         this._scene.add(plane);
 
-        this._LoadMaze();
-
+       // this._loadEnvironment();
+        //this._createDummyEnvironment();
+        this._LoadMazeFBX();
         this._mixers = [];
         this._previousRAF = null;
         this._clock = new THREE.Clock();
@@ -708,12 +716,46 @@ class CharacterControllerDemo {
         this._RAF();
     }
 
+    _movePlayer() {
+        const pos = Target.Position;
+        pos.y += 60;
+        let dir = new THREE.Vector3();
+        this._camera.getWorldDirection(dir);
+
+        let raycaster = new THREE.Raycaster(pos, dir);
+
+        let blocked = false;
+
+
+        for (let box of this.environmentProxy.children) { //environmentProxy stores all the boxes that we created in createDummyEnv
+            const intersect = raycaster.intersectObject(box);
+            if (intersect.length > 0) {  //intersect is an array that stores all the boxes that is in the path of our raycaster
+                if (intersect[0].distance < DistFromBox) { //it is ordered by distance , so the closest is at pos[0] ,hence intersect[0].
+                    console.log(DistFromBox);
+                    blocked = true;  //Player should not be able to move in that direction
+                    console.log("cannot proceed forward.");
+                    AvailableControls.forward = false;
+                    break;
+                }
+            }
+        }
+        if (!blocked && AvailableControls.forward == false) {
+            AvailableControls.forward = false;
+        }
+    }
+
     _LoadAnimatedModel(ctrls) {
         const params = {
             camera: this._camera,
             scene: this._scene,
         }
         this._controls = new BasicCharacterController(params);
+        console.log("CONTROLS");
+
+
+        AvailableControls = this._controls._input._keys;
+        console.log(AvailableControls);
+
         Target = this._controls;
         Cam = this._camera;
         //create cameras
@@ -749,16 +791,79 @@ class CharacterControllerDemo {
             this._scene.add(fbx);
         });
     }
-    _LoadMaze() {
+    _createDummyEnvironment() {
+        const env = new THREE.Group();
+        env.name = "Environment";
+        this._scene.add(env);
+
+        const geometry = new THREE.BoxBufferGeometry(150, 150, 150);
+        const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+
+        for (let x = -1000; x < 1000; x += 300) {
+            for (let z = -1000; z < 1000; z += 300) {
+                const block = new THREE.Mesh(geometry, material);
+                block.position.set(x, 75, z);
+                env.add(block);
+            }
+        }
+        this.environmentProxy = env;
+    }
+
+    _LoadMazeGLTF() {
         const loader = new GLTFLoader();
         loader.load('../resources/TestingMaze.gltf', (gltf) => {
             gltf.scene.traverse(c => {
                 c.castShadow = true;
             });
-            gltf.scene.scale.multiplyScalar(10000);
+            gltf.scene.scale.multiplyScalar(1000);
             this._scene.add(gltf.scene);
         });
     }
+
+    _LoadMazeFBX() {
+        const loader = new FBXLoader();
+
+        loader.load('../resources/testScale.fbx', (fbx) => {
+            console.log("loaded new fbx");
+
+            fbx.traverse(c => {
+                console.log(c.isMesh);
+               c.castShadow = true;
+            });
+            this._scene.add(fbx);
+            console.log(fbx);
+        });
+        console.log("loaded maze..");
+
+
+    }
+
+    _loadEnvironment(){
+		const game = this;
+        const loader = new FBXLoader();
+
+		loader.load( '../resources/testScaleWIthGeo.fbx', function ( object ) {
+
+			game._scene.add(object);
+			object.receiveShadow = true;
+			object.scale.set(0.8, 0.8, 0.8);
+			object.name = "Environment";
+
+			object.traverse( function ( child ) {
+				if ( child.isMesh ) {
+					if (child.name.includes('main')){
+						child.castShadow = true;
+						child.receiveShadow = true;
+					}
+					else if (child.name.includes('mentproxy')){
+						child.material.visible = false;
+						game.environmentProxy = child;
+						console.log(game.environmentProxy);
+					}
+				}
+			} );
+		}, null, this.onError );
+	}
 
     _OnWindowResize() {
         this._camera.aspect = window.innerWidth / window.innerHeight;
@@ -773,6 +878,11 @@ class CharacterControllerDemo {
             }
 
             let delta = this._clock.getDelta();
+
+
+            //this._movePlayer(delta);
+
+
 
             //  if (this.physicsWorld) {
             //    this._updatePhysics(delta);
@@ -790,6 +900,7 @@ class CharacterControllerDemo {
             //update mixers
             this._mixers.map(m => m.update(timeElapsedS));
         }
+
         if (this.physicsWorld) {
             this._updatePhysics(timeElapsed);
         }
