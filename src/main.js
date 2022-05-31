@@ -705,9 +705,9 @@ class CharacterControllerDemo {
         plane.rotation.x = -Math.PI / 2;
         this._scene.add(plane);
 
-       // this._loadEnvironment();
         //this._createDummyEnvironment();
-        this._LoadMazeFBX();
+        //this._LoadMazeFBX();
+        this._loadEnvironment();
         this._mixers = [];
         this._previousRAF = null;
         this._clock = new THREE.Clock();
@@ -717,6 +717,7 @@ class CharacterControllerDemo {
     }
 
     _movePlayer() {
+       if(this.environmentProxy){
         const pos = Target.Position;
         pos.y += 60;
         let dir = new THREE.Vector3();
@@ -728,7 +729,9 @@ class CharacterControllerDemo {
 
 
         for (let box of this.environmentProxy.children) { //environmentProxy stores all the boxes that we created in createDummyEnv
+            
             const intersect = raycaster.intersectObject(box);
+            //console.log(box);
             if (intersect.length > 0) {  //intersect is an array that stores all the boxes that is in the path of our raycaster
                 if (intersect[0].distance < DistFromBox) { //it is ordered by distance , so the closest is at pos[0] ,hence intersect[0].
                     console.log(DistFromBox);
@@ -742,6 +745,7 @@ class CharacterControllerDemo {
         if (!blocked && AvailableControls.forward == false) {
             AvailableControls.forward = false;
         }
+       }
     }
 
     _LoadAnimatedModel(ctrls) {
@@ -825,13 +829,11 @@ class CharacterControllerDemo {
 
         loader.load('../resources/testScale.fbx', (fbx) => {
             console.log("loaded new fbx");
-
+            console.log(fbx);
             fbx.traverse(c => {
-                console.log(c.isMesh);
                c.castShadow = true;
             });
             this._scene.add(fbx);
-            console.log(fbx);
         });
         console.log("loaded maze..");
 
@@ -842,26 +844,21 @@ class CharacterControllerDemo {
 		const game = this;
         const loader = new FBXLoader();
 
-		loader.load( '../resources/testScaleWIthGeo.fbx', function ( object ) {
-
+		loader.load( '../resources/testScale.fbx', function ( object ) {
+            console.log(object);
 			game._scene.add(object);
 			object.receiveShadow = true;
-			object.scale.set(0.8, 0.8, 0.8);
+			//object.scale.set(0.8, 0.8, 0.8);
 			object.name = "Environment";
+            game.environmentProxy = object;
+            //game.sceneMeshes = [];
 
-			object.traverse( function ( child ) {
-				if ( child.isMesh ) {
-					if (child.name.includes('main')){
-						child.castShadow = true;
-						child.receiveShadow = true;
-					}
-					else if (child.name.includes('mentproxy')){
-						child.material.visible = false;
-						game.environmentProxy = child;
-						console.log(game.environmentProxy);
-					}
-				}
-			} );
+			// object.traverse( function ( child ) {
+			// 	if ( child.isMesh ) {
+            //         console.log(child);
+            //         //game.sceneMeshes.push(new THREE.Mesh(child));
+			// 	}
+			// } );
 		}, null, this.onError );
 	}
 
@@ -880,9 +877,7 @@ class CharacterControllerDemo {
             let delta = this._clock.getDelta();
 
 
-            //this._movePlayer(delta);
-
-
+            this._movePlayer(delta);
 
             //  if (this.physicsWorld) {
             //    this._updatePhysics(delta);
